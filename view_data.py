@@ -2,10 +2,13 @@
 #%%
 # import torch
 from torch.utils.data import DataLoader
-from torchvision import datasets, transforms
+from torchvision import datasets, transforms, utils
 # from torchvision.transforms import v2 as transforms
 import numpy as np
 import matplotlib.pyplot as plt
+import shutil
+import os
+from torch.utils.tensorboard.writer import SummaryWriter
 
 
 #%%
@@ -59,6 +62,7 @@ data['test'] = datasets.Flowers102(
     transform=data_transforms['valid']
 )
 
+
 def im_convert(tensor):
     """ 还原数据 """
     image = tensor.numpy().squeeze()
@@ -66,6 +70,19 @@ def im_convert(tensor):
     image = image * np.array(meta_data['im_std']) + np.array(meta_data['im_mean'])
     image = image.clip(0, 1)    # 由于浮点操作过程中的误差，逆标准化后的像素值可能会超出[0,1]，故需钳位
     return image
+
+
+class Writer(SummaryWriter):
+    def __init__(self, runs_path='runs', flush_secs=120) -> None:
+        self.runs_path = runs_path
+        super().__init__(runs_path, flush_secs=120)
+
+    def clear_runs(self):
+        shutil.rmtree(self.runs_path)
+        os.makedirs(self.runs_path)
+
+
+writer =  Writer('runs/flower102_experiment_1', flush_secs=30)
 
 
 #%%
@@ -88,11 +105,16 @@ if __name__ == '__main__':
     # dataiter = iter(dataloader['valid'])
     img, label = next(dataiter)
 
-    for i in range(batch_size):
-        axf[i].imshow(im_convert(img[i]))
-        axf[i].set_title(f'{label[i]}')
-    fig.tight_layout()
-    plt.show()
+    # for i in range(batch_size):
+    #     axf[i].imshow(im_convert(img[i]))
+    #     axf[i].set_title(f'{label[i]}')
+    # fig.tight_layout()
+    # plt.show()
+
+    img_grig = utils.make_grid(img, 4)
+    writer.clear_runs()
+    writer.add_image('train_imaeges', img_grig)
+    writer.close()
 
 
 # %%

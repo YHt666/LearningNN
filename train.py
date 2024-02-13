@@ -12,7 +12,7 @@ from tqdm import tqdm
 import pickle
 import matplotlib.pylab as plt
 
-from view_data import data
+from view_data import data, writer
 from model import initialize_model
 
 
@@ -70,6 +70,7 @@ def train_model(model, dataloader, loss_fn, optimizer, scheduler, params):
                 'avg_loss': total_loss / batch_count,
                 'lr': optimizer.param_groups[0]['lr'],
                                       })
+            writer.add_scalar('training loss', loss.item(), total_step)
             
             total_step += 1
             train_loss_list.append((total_step, loss.item()))
@@ -78,8 +79,11 @@ def train_model(model, dataloader, loss_fn, optimizer, scheduler, params):
             if total_step % params['eval_interval'] == 0:
                 valid_loss, correct = valid_model(model, dataloader['valid'], loss_fn)
                 tqdm.write(f'\nEval: Loss: {valid_loss}, Accuracy: {100*correct}%')
+                writer.add_scalar('validation loss', valid_loss, total_step)
+                writer.add_scalar('validation accuracy', correct, total_step)
                 valid_loss_list.append((total_step, valid_loss))
                 valid_acc_list.append((total_step, correct))
+                # record the best model
                 if correct > best_acc:
                     best_record = {
                         'step': total_step,
@@ -87,6 +91,10 @@ def train_model(model, dataloader, loss_fn, optimizer, scheduler, params):
                         'acc': correct,
                     }
                     best_acc = correct
+                # output model parameters
+                for name, param in model.named_parameters():
+                    if param.requires_grad:
+                        writer.add_histogram(name, param, total_step)
 
             # save model
             if total_step % params['save_interval'] == 0:
@@ -98,19 +106,23 @@ def train_model(model, dataloader, loss_fn, optimizer, scheduler, params):
                 )
 
         scheduler.step()
+    writer.close()
     return train_loss_list, valid_loss_list, valid_acc_list, best_record
 
 
 if __name__ == '__main__':
     # 训练参数设置
     params = {
-        'model_name': 'vgg',  # 选择官方提供的模型，可选['resnet', 'alexnet', 'vgg']
+        'model_name': 'resnet',  # 选择官方提供的模型，可选['resnet', 'alexnet', 'vgg']
         'lr': 1e-2,
         'batch_size': 64,
-        'epoch': 10,
+        'epoch': 3,
         'eval_interval': 50,   # 每隔多少batch评估一次
         'save_interval': 100,   # 每隔多少batch保存一次
     }
+
+    writer.clear_runs()
+
     # 模型文件保存根目录
     save_path = f'temp/model/{params["model_name"]}/BS{params["batch_size"]}LR{params["lr"]}'
     if not os.path.exists(save_path):
@@ -125,13 +137,13 @@ if __name__ == '__main__':
     feature_extract = True
     model = initialize_model(model_name, 102, feature_extract, use_pretrained=True)
     model = model.to(device)
-    print(model)
+    print(model._get_name())
 
     # 查看训练的层
     print('params to learn:')
     params_to_update = []
     for name, param in model.named_parameters():
-        if param.requires_grad == True:
+        if param.requires_grad:
             params_to_update.append(param)
             print('\t', name)
 
@@ -142,6 +154,11 @@ if __name__ == '__main__':
     batch_size = params['batch_size']
     dataloader = {x: DataLoader(data[x], batch_size=batch_size, shuffle=True, 
                                 num_workers=2, pin_memory=True) for x in ['train', 'valid']}
+    
+    dataiter = iter(dataloader['train'])
+    images, labels = next(dataiter)
+    writer.add_graph(model, images.cuda())
+    writer.close()
     
     while True:
         if input('Start train? (y/n)') == 'y':

@@ -1,3 +1,5 @@
+![cover](/images/deploy.png "cover")
+
 # LearningNN['main']
 
 main branch基于Pytorch（2.2.0）实现了三种经典的卷积神经网络（CNN）：AlexNet、Vgg和ResNet。数据集选用torchvision自带的flower102数据集，在预训练模型的基础上调整最后的全连接层实现花卉分类。此项目包含完整代码，在环境配置正确的情况下能够开箱即用。

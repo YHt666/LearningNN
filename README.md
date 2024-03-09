@@ -23,6 +23,11 @@
 
 ## tensorboard使用注意事项
 
+* 安装
+  ```cmd
+  pip install tensorboard
+  ```
+
 * 在命令行输入
 
     ```cmd
